@@ -1,0 +1,29 @@
+profile=default
+
+break-cases=toplevel
+break-separators=after
+indicate-multiline-delimiters=closing-on-separate-line
+break-fun-decl = smart
+break-infix = fit-or-vertical
+cases-exp-indent = 2
+doc-comments = before
+field-space = tight-decl
+leading-nested-match-parens = false
+break-sequences=false
+m=80
+let-binding-spacing=double-semicolon
+
+
+# I could go either way on this...
+# parens-tuple = multi-line-only
+# parens-tuple-patterns = multi-line-only
+#
+sequence-blank-line = preserve-one
+sequence-style = terminator
+# space-around-lists = false
+# space-around-records = true
+# space-around-variants = true
+type-decl = sparse
+# if-then-else = k-r
+indicate-nested-or-patterns = space
+dock-collection-brackets = true
