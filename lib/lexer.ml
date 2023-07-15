@@ -89,6 +89,12 @@ module Token = struct
     | _ -> false
   ;;
 
+  let equal_op a b =
+    match a with
+    | Some a -> equal a b
+    | None -> false
+  ;;
+
   let to_string tok = tok.lit
 end
 
@@ -150,7 +156,7 @@ let of_char a lex =
     | '=' -> { toktype = Assign; lit = String.of_char '=' }
     | ';' -> { toktype = Semicolon; lit = String.of_char ';' }
     | '(' -> { toktype = Lparen; lit = String.of_char '(' }
-    | ')' -> { toktype = Lparen; lit = String.of_char ')' }
+    | ')' -> { toktype = Rparen; lit = String.of_char ')' }
     | ',' -> { toktype = Comma; lit = String.of_char ',' }
     | '+' -> { toktype = Plus; lit = String.of_char '+' }
     | '{' -> { toktype = Lbrace; lit = String.of_char '{' }
@@ -185,39 +191,5 @@ let next_token lex =
   | None -> None
 ;;
 
-let to_seq lex = Sequence.unfold ~init:lex ~f:next_token
-let sexp_of_token = Token.sexp_of_t
-
-type ptokenseq = {
-  next_token: Token.t option;
-  seq: Token.t Sequence.t option;
-}
-[@@deriving sexp_of]
-
-let to_peekable (tokseq : Token.t Sequence.t) : ptokenseq =
-  let next a =
-    match Sequence.next a with
-    | Some (tok, seq) -> (Some tok, Some seq)
-    | None -> (None, None)
-  in
-  let next_token, tokseq = next tokseq in
-  { next_token; seq = tokseq }
-;;
-
-let advance { seq; _ } : ptokenseq =
-  let next_token, seq =
-    match seq with
-    | Some a -> (
-      match Sequence.next a with
-      | Some (tok, seq) -> (Some tok, Some seq)
-      | None -> (None, None)
-    )
-    | None -> (None, None)
-  in
-  { next_token; seq }
-;;
-
-let of_string_reg str = str |> build |> read_char |> to_seq
-let of_string str = str |> build |> read_char |> to_seq |> to_peekable
-let next pts = (pts.next_token, advance pts)
-let peek pts = pts.next_token
+let to_list lex = Sequence.unfold ~init:lex ~f:next_token |> Sequence.to_list
+let of_string str = str |> build |> read_char |> to_list

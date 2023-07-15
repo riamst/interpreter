@@ -30,26 +30,25 @@ let repl () =
       with _ -> printf "%s\n" "Exiting"; exit 0
     in
     let open Parser in
-    parse ~using:block input |> fun parsed ->
+    parse ~using:statement input |> fun parsed ->
     match parsed with
-    | Ok (_, a) ->
-      printf "%s\n" (sexp_of_list Parser.sexp_of_expr a |> Sexp.to_string_hum)
+    | Ok (_, a) -> printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum)
     | Error e -> printf "%s\n" e
   done
 ;;
 
 let () =
-  let tokens = Lexer.of_string input in
-  let tokens_reg = Lexer.of_string_reg input in
-  Sequence.iter
-    ~f:(fun a -> a |> Lexer.sexp_of_token |> Sexp.to_string_hum |> print_endline)
-    tokens_reg;
+  (* let tokens = Lexer.of_string input in *)
+  (* let tokens_reg = Lexer.of_string_reg input in *)
+  (* Sequence.iter *)
+  (*   ~f:(fun a -> a |> Lexer.sexp_of_token |> Sexp.to_string_hum |> print_endline) *)
+  (*   tokens_reg; *)
 
-  let open Parser in
-  tokens
-  |> many statement
-  |> sexp_of_pResult (sexp_of_list sexp_of_expr)
-  |> Sexp.to_string_hum
-  |> print_endline;
+  (* let open Parser in *)
+  (* tokens *)
+  (* |> many statement *)
+  (* |> sexp_of_pResult (sexp_of_list sexp_of_expr) *)
+  (* |> Sexp.to_string_hum *)
+  (* |> print_endline; *)
   repl ()
 ;;

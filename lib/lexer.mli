@@ -3,8 +3,6 @@ open Core
 type t
 
 module Token : sig
-  type t
-
   type tokentype =
     | Illegal
     (* Identifiers + literals *)
@@ -37,16 +35,16 @@ module Token : sig
     | Else
     | Return
 
+  type t = {
+    toktype: tokentype;
+    lit: string;
+  }
+
+  val sexp_of_t : t -> Sexp.t
   val equal : t -> tokentype -> bool
+  val equal_op : t option -> tokentype -> bool
   val to_string : t -> string
   val sexp_of_tokentype : tokentype -> Sexp.t
 end
 
-type ptokenseq
-
-val sexp_of_ptokenseq : ptokenseq -> Sexp.t
-val of_string : string -> ptokenseq
-val of_string_reg : string -> Token.t Sequence.t
-val sexp_of_token : Token.t -> Sexp.t
-val next : ptokenseq -> Token.t option * ptokenseq
-val peek : ptokenseq -> Token.t option
+val of_string : string -> Token.t list
