@@ -15,7 +15,7 @@ let map ~(f : 'a -> 'b) (p : 'a parser) : 'b parser =
  fun input ->
   match p input with
   | Ok (input', x) -> Ok (input', f x)
-  | Error error -> Error error
+  | Error e -> Error e
 ;;
 
 let tag (token_tag : Token.tokentype) : string parser =
@@ -94,18 +94,26 @@ let expression = int
 let ident = tag Token.Ident |> map ~f:(fun a -> Ident a)
 
 let let_s : expr parser =
-  let p1 =
-    tag Token.Let *> ident
-    <* tag Token.Assign
-    <*> expression
-    <* optional (tag Token.Semicolon)
-  in
-  map ~f:(fun (a, b) -> Let (a, b)) p1
+  tag Token.Let *> ident
+  <* tag Token.Assign
+  <*> expression
+  <* optional (tag Token.Semicolon)
+  |> map ~f:(fun (a, b) -> Let (a, b))
 ;;
 
 let return_s : expr parser =
-  let p1 = tag Token.Return *> expression <* optional (tag Token.Semicolon) in
-  map ~f:(fun a -> Return a) p1
+  tag Token.Return *> expression
+  <* optional (tag Token.Semicolon)
+  |> map ~f:(fun a -> Return a)
 ;;
 
-let statement = let_s <|> return_s
+let expression_s : expr parser = expression <* optional (tag Token.Semicolon)
+let statement = let_s <|> return_s <|> expression_s
+
+let block =
+  let opl = optional (tag Token.Lbrace) in
+  let opr = optional (tag Token.Rbrace) in
+  opl *> many statement <* opr
+;;
+
+let parse ~using:(p : 'a parser) str = str |> Lexer.of_string |> p

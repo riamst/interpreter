@@ -19,6 +19,25 @@ let input =
    10 != 9;"
 ;;
 
+let repl () =
+  while true do
+    printf "%s" "> ";
+    Out_channel.flush stdout;
+    let input =
+      try
+        let a = In_channel.input_line In_channel.stdin |> Option.value_exn in
+        if String.equal a "exit" then failwith "exiting" else a
+      with _ -> printf "%s\n" "Exiting"; exit 0
+    in
+    let open Parser in
+    parse ~using:block input |> fun parsed ->
+    match parsed with
+    | Ok (_, a) ->
+      printf "%s\n" (sexp_of_list Parser.sexp_of_expr a |> Sexp.to_string_hum)
+    | Error e -> printf "%s\n" e
+  done
+;;
+
 let () =
   let tokens = Lexer.of_string input in
   let tokens_reg = Lexer.of_string_reg input in
@@ -31,5 +50,6 @@ let () =
   |> many statement
   |> sexp_of_pResult (sexp_of_list sexp_of_expr)
   |> Sexp.to_string_hum
-  |> print_endline
+  |> print_endline;
+  repl ()
 ;;
