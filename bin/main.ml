@@ -23,5 +23,12 @@ let () =
   let lexer = Lexer.of_string input in
   Sequence.iter
     ~f:(fun a -> a |> Lexer.sexp_of_token |> Sexp.to_string_hum |> print_endline)
-    lexer
+    lexer;
+
+  let open Parser in
+  lexer
+  |> many statement
+  |> sexp_of_pResult (sexp_of_list sexp_of_expr)
+  |> Sexp.to_string_hum
+  |> print_endline
 ;;

@@ -53,6 +53,43 @@ module Token = struct
   ;;
 
   let int a = { toktype = Int; lit = a }
+
+  let equal a b =
+    match (a.toktype, b) with
+    | Illegal, Illegal -> true
+    (* Identifiers *)
+    | Ident, Ident -> true
+    | Int, Int -> true
+    (* Operators *)
+    | Assign, Assign -> true
+    | Plus, Plus -> true
+    | Minus, Minus -> true
+    | Bang, Bang -> true
+    | Asterisk, Asterisk -> true
+    | Slash, Slash -> true
+    | Lt, Lt -> true
+    | Gt, Gt -> true
+    | Equals, Equals -> true
+    | Not_equals, Not_equals -> true
+    (* Delimiters *)
+    | Comma, Comma -> true
+    | Semicolon, Semicolon -> true
+    | Lparen, Lparen -> true
+    | Rparen, Rparen -> true
+    | Lbrace, Lbrace -> true
+    | Rbrace, Rbrace -> true
+    (* Keywords *)
+    | Function, Function -> true
+    | Let, Let -> true
+    | True, True -> true
+    | False, False -> true
+    | If, If -> true
+    | Else, Else -> true
+    | Return, Return -> true
+    | _ -> false
+  ;;
+
+  let to_string tok = tok.lit
 end
 
 type t = {
