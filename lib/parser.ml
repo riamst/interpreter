@@ -1,10 +1,8 @@
 open Core
 open Lexer
 
-type token = Token.t
-type tokenseq = token Sequence.t [@@deriving sexp_of]
-type 'a pResult = (tokenseq * 'a, string) Result.t [@@deriving sexp_of]
-type 'a parser = tokenseq -> 'a pResult
+type 'a pResult = (ptokenseq * 'a, string) Result.t [@@deriving sexp_of]
+type 'a parser = ptokenseq -> 'a pResult
 
 type expr =
   | Let of (expr * expr)
@@ -22,15 +20,15 @@ let map ~(f : 'a -> 'b) (p : 'a parser) : 'b parser =
 
 let tag (token_tag : Token.tokentype) : string parser =
  fun input ->
-  match Sequence.next input with
-  | Some (t, rest) when Token.equal t token_tag -> Ok (rest, Token.to_string t)
-  | Some (t, _) ->
+  match next input with
+  | Some t, pts when Token.equal t token_tag -> Ok (pts, Token.to_string t)
+  | Some t, _ ->
     Error
       (Printf.sprintf "expected %s, found %s\n"
          (token_tag |> Token.sexp_of_tokentype |> Sexp.to_string_hum)
          (t |> Lexer.sexp_of_token |> Sexp.to_string_hum)
       )
-  | None -> Error "End of File"
+  | None, _ -> Error "End of File"
 ;;
 
 let ( *> ) (p1 : 'a parser) (p2 : 'b parser) : 'b parser =
@@ -59,7 +57,7 @@ let ( <*> ) (p1 : 'a parser) (p2 : 'b parser) : ('a * 'b) parser =
 ;;
 
 let ( <|> ) (p1 : 'a parser) (p2 : 'a parser) : 'a parser =
- fun (input : tokenseq) ->
+ fun input ->
   match p1 input with
   | Ok (input', x) -> Ok (input', x)
   | Error left_error ->

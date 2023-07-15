@@ -42,5 +42,11 @@ module Token : sig
   val sexp_of_tokentype : tokentype -> Sexp.t
 end
 
-val of_string : string -> Token.t Sequence.t
+type ptokenseq
+
+val sexp_of_ptokenseq : ptokenseq -> Sexp.t
+val of_string : string -> ptokenseq
+val of_string_reg : string -> Token.t Sequence.t
 val sexp_of_token : Token.t -> Sexp.t
+val next : ptokenseq -> Token.t option * ptokenseq
+val peek : ptokenseq -> Token.t option

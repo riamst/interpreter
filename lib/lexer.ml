@@ -118,8 +118,7 @@ let peek_char { input; read_pos; _ } =
 let expect_peek lex a = Char.equal (Option.value ~default:'0' (peek_char lex)) a
 
 let read_while ~f lex =
-  let str = String.subo ?pos:(Some lex.pos) lex.input in
-  let str = String.take_while ~f str in
+  let str = String.subo ?pos:(Some lex.pos) lex.input |> String.take_while ~f in
   let pos = lex.pos + String.length str in
   let next_lex =
     {
@@ -187,5 +186,38 @@ let next_token lex =
 ;;
 
 let to_seq lex = Sequence.unfold ~init:lex ~f:next_token
-let of_string str = str |> build |> read_char |> to_seq
 let sexp_of_token = Token.sexp_of_t
+
+type ptokenseq = {
+  next_token: Token.t option;
+  seq: Token.t Sequence.t option;
+}
+[@@deriving sexp_of]
+
+let to_peekable (tokseq : Token.t Sequence.t) : ptokenseq =
+  let next a =
+    match Sequence.next a with
+    | Some (tok, seq) -> (Some tok, Some seq)
+    | None -> (None, None)
+  in
+  let next_token, tokseq = next tokseq in
+  { next_token; seq = tokseq }
+;;
+
+let advance { seq; _ } : ptokenseq =
+  let next_token, seq =
+    match seq with
+    | Some a -> (
+      match Sequence.next a with
+      | Some (tok, seq) -> (Some tok, Some seq)
+      | None -> (None, None)
+    )
+    | None -> (None, None)
+  in
+  { next_token; seq }
+;;
+
+let of_string_reg str = str |> build |> read_char |> to_seq
+let of_string str = str |> build |> read_char |> to_seq |> to_peekable
+let next pts = (pts.next_token, advance pts)
+let peek pts = pts.next_token
