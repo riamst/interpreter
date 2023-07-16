@@ -46,6 +46,7 @@ module Token = struct
     | "fn" -> { toktype = Function; lit = "fn" }
     | "let" -> { toktype = Let; lit = "let" }
     | "true" -> { toktype = True; lit = "true" }
+    | "false" -> { toktype = False; lit = "false" }
     | "if" -> { toktype = If; lit = "if" }
     | "else" -> { toktype = Else; lit = "else" }
     | "return" -> { toktype = Return; lit = "return" }
@@ -148,10 +149,11 @@ let skip_ws lex : t =
 
 let of_char a lex =
   let open Token in
+  let lex = ref lex in
   let tok =
     match a with
-    | '=' when expect_peek lex '=' ->
-      let lex = read_char lex in
+    | '=' when expect_peek !lex '=' ->
+      lex := read_char !lex;
       { toktype = Equals; lit = "==" }
     | '=' -> { toktype = Assign; lit = String.of_char '=' }
     | ';' -> { toktype = Semicolon; lit = String.of_char ';' }
@@ -162,8 +164,8 @@ let of_char a lex =
     | '{' -> { toktype = Lbrace; lit = String.of_char '{' }
     | '}' -> { toktype = Rbrace; lit = String.of_char '}' }
     | '-' -> { toktype = Minus; lit = String.of_char '-' }
-    | '!' when expect_peek lex '=' ->
-      let lex = read_char lex in
+    | '!' when expect_peek !lex '=' ->
+      lex := read_char !lex;
       { toktype = Not_equals; lit = "!=" }
     | '!' -> { toktype = Bang; lit = String.of_char '!' }
     | '*' -> { toktype = Asterisk; lit = String.of_char '*' }
@@ -172,7 +174,7 @@ let of_char a lex =
     | '>' -> { toktype = Gt; lit = String.of_char '>' }
     | a -> { toktype = Illegal; lit = String.of_char a }
   in
-  (tok, read_char lex)
+  (tok, read_char !lex)
 ;;
 
 let next_token lex =

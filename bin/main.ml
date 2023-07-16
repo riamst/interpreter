@@ -32,27 +32,25 @@ let repl () =
     let open Parser in
     parse ~using:statement input |> fun parsed ->
     match parsed with
-    | Ok (rest, a) ->
-      printf "%s\n" (Parser.sexp_of_statement a |> Sexp.to_string_hum);
-      printf "%s\n"
-        (sexp_of_list Lexer.Token.sexp_of_t rest |> Sexp.to_string_hum)
+    | Ok (_, a) ->
+      printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum);
+      printf "%s\n" (Eval.eval a |> Eval.sexp_of_value |> Sexp.to_string_hum)
     | Error e -> printf "%s\n" e
   done
 ;;
 
 let () =
-  let tokens = Lexer.of_string input in
-  List.iter
-    ~f:(fun a ->
-      a |> Lexer.Token.sexp_of_t |> Sexp.to_string_hum |> print_endline
-    )
-    tokens;
-
-  let open Parser in
-  tokens
-  |> many statement
-  |> sexp_of_pResult (sexp_of_list sexp_of_statement)
-  |> Sexp.to_string_hum
-  |> print_endline;
+  (* let tokens = Lexer.of_string input in *)
+  (* List.iter *)
+  (*   ~f:(fun a -> *)
+  (*     a |> Lexer.Token.sexp_of_t |> Sexp.to_string_hum |> print_endline *)
+  (*   ) *)
+  (*   tokens; *)
+  (* let open Parser in *)
+  (* tokens *)
+  (* |> many statement *)
+  (* |> sexp_of_pResult (sexp_of_list sexp_of_statement) *)
+  (* |> Sexp.to_string_hum *)
+  (* |> print_endline; *)
   repl ()
 ;;

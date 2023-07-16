@@ -17,14 +17,11 @@ type operator =
   | Neg
 [@@deriving sexp]
 
-type statement =
-  | Let of expr * expr
-  | Return of expr
-  | Expression of expr
-
-and block = statement list
+and block = expr list
 
 and expr =
+  | Let of expr * expr
+  | Return of expr
   | Int_lit of int
   | Bool_lit of bool
   | Ident of string
@@ -120,7 +117,7 @@ let delimited (delim : 'a parser) (elem : 'b parser) : 'b list parser =
 let int = tag Token.Int |> map ~f:(fun a -> Int_lit (Int.of_string a))
 let ident = tag Token.Ident |> map ~f:(fun a -> Ident a)
 let btrue = tag Token.True |> map ~f:(fun _ -> Bool_lit true)
-let bfalse = tag Token.True |> map ~f:(fun _ -> Bool_lit false)
+let bfalse = tag Token.False |> map ~f:(fun _ -> Bool_lit false)
 
 (* OPERATOR PRECEDENCE: *)
 let lowest = 0
@@ -220,25 +217,25 @@ and div lhs input =
     input
 
 and equ lhs input =
-  (tag Token.Equals *> expression ~minp:muldiv
+  (tag Token.Equals *> expression ~minp:equals
   |> map ~f:(fun a -> Bin_op (Equ, lhs, a))
   )
     input
 
 and neq lhs input =
-  (tag Token.Not_equals *> expression ~minp:muldiv
+  (tag Token.Not_equals *> expression ~minp:equals
   |> map ~f:(fun a -> Bin_op (Neq, lhs, a))
   )
     input
 
 and les lhs input =
-  (tag Token.Lt *> expression ~minp:muldiv
+  (tag Token.Lt *> expression ~minp:lesgre
   |> map ~f:(fun a -> Bin_op (Les, lhs, a))
   )
     input
 
 and gre lhs input =
-  (tag Token.Gt *> expression ~minp:muldiv
+  (tag Token.Gt *> expression ~minp:lesgre
   |> map ~f:(fun a -> Bin_op (Gre, lhs, a))
   )
     input
@@ -274,11 +271,7 @@ and return_s input =
     input
 
 and expression_s input =
-  (expression ~minp:lowest
-  <* optional (tag Token.Semicolon)
-  |> map ~f:(fun a -> Expression a)
-  )
-    input
+  (expression ~minp:lowest <* optional (tag Token.Semicolon)) input
 
 and statement input = (let_s <|> return_s <|> expression_s) input
 
@@ -326,7 +319,7 @@ and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   | _ -> None
 ;;
 
-let let_s : statement parser =
+let let_s : expr parser =
   tag Token.Let *> ident
   <* tag Token.Assign
   <*> expression ~minp:lowest
@@ -334,16 +327,16 @@ let let_s : statement parser =
   |> map ~f:(fun (a, b) -> Let (a, b))
 ;;
 
-let return_s : statement parser =
+let return_s : expr parser =
   tag Token.Return *> expression ~minp:lowest
   <* optional (tag Token.Semicolon)
   |> map ~f:(fun a -> Return a)
 ;;
 
-let expression_s : statement parser =
+let expression_s : expr parser =
   expression ~minp:lowest
   <* optional (tag Token.Semicolon)
-  |> map ~f:(fun a -> Expression a)
+  |> map ~f:(fun a -> a)
 ;;
 
 let statement = let_s <|> return_s <|> expression_s
