@@ -309,10 +309,7 @@ and get_prefix_fn (tok : Token.t) : expr parser option =
   | Lparen -> Some grouped
   | If -> Some ifp
   | Function -> Some func
-  | a ->
-    printf "Error no prefix: %s\n"
-      (a |> Token.sexp_of_tokentype |> Sexp.to_string_hum);
-    None
+  | _ -> None
 
 and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   let open Token in
@@ -326,10 +323,7 @@ and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   | Lt -> Some les
   | Gt -> Some gre
   | Lparen -> Some call
-  | a ->
-    printf "Error no infix: %s\n"
-      (a |> Token.sexp_of_tokentype |> Sexp.to_string_hum);
-    None
+  | _ -> None
 ;;
 
 let let_s : statement parser =
