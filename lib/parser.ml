@@ -31,6 +31,8 @@ and expr =
   | Un_op of operator * expr
   | Bin_op of operator * expr * expr
   | If of expr * block * block
+  | Fn_lit of expr list * block
+  | Call of expr * expr list
 [@@deriving sexp]
 
 let map ~(f : 'a -> 'b) (p : 'a parser) : 'b parser =
@@ -111,6 +113,10 @@ let many (p : 'a parser) : 'a list parser =
   Ok (rest, List.rev !result)
 ;;
 
+let delimited (delim : 'a parser) (elem : 'b parser) : 'b list parser =
+  elem <*> many (delim *> elem) |> map ~f:(fun (a, b) -> a :: b)
+;;
+
 let int = tag Token.Int |> map ~f:(fun a -> Int_lit (Int.of_string a))
 let ident = tag Token.Ident |> map ~f:(fun a -> Ident a)
 let btrue = tag Token.True |> map ~f:(fun _ -> Bool_lit true)
@@ -132,6 +138,7 @@ let prec tok =
   | Asterisk | Slash -> muldiv
   | Lt | Gt -> lesgre
   | Equals | Not_equals -> equals
+  | Lparen -> fncall
   | _ -> lowest
 ;;
 
@@ -275,6 +282,21 @@ and expression_s input =
 
 and statement input = (let_s <|> return_s <|> expression_s) input
 
+and func input =
+  (tag Token.Function *> tag Token.Lparen *> delimited (tag Token.Comma) ident
+  <* tag Token.Rparen
+  <*> block
+  |> map ~f:(fun (a, b) -> Fn_lit (a, b))
+  )
+    input
+
+and call lhs input =
+  (tag Token.Lparen *> delimited (tag Token.Comma) (expression ~minp:lowest)
+  <* tag Token.Rparen
+  |> map ~f:(fun a -> Call (lhs, a))
+  )
+    input
+
 and get_prefix_fn (tok : Token.t) : expr parser option =
   let open Token in
   match tok.toktype with
@@ -286,7 +308,11 @@ and get_prefix_fn (tok : Token.t) : expr parser option =
   | False -> Some bfalse
   | Lparen -> Some grouped
   | If -> Some ifp
-  | _ -> None
+  | Function -> Some func
+  | a ->
+    printf "Error no prefix: %s\n"
+      (a |> Token.sexp_of_tokentype |> Sexp.to_string_hum);
+    None
 
 and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   let open Token in
@@ -299,7 +325,11 @@ and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   | Not_equals -> Some neq
   | Lt -> Some les
   | Gt -> Some gre
-  | _ -> None
+  | Lparen -> Some call
+  | a ->
+    printf "Error no infix: %s\n"
+      (a |> Token.sexp_of_tokentype |> Sexp.to_string_hum);
+    None
 ;;
 
 let let_s : statement parser =
