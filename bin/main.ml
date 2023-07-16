@@ -32,7 +32,8 @@ let repl () =
     let open Parser in
     parse ~using:statement input |> fun parsed ->
     match parsed with
-    | Ok (_, a) -> printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum)
+    | Ok (_, a) ->
+      printf "%s\n" (Parser.sexp_of_statement a |> Sexp.to_string_hum)
     | Error e -> printf "%s\n" e
   done
 ;;

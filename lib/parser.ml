@@ -4,28 +4,33 @@ open Lexer
 type 'a pResult = (Token.t list * 'a, string) Result.t [@@deriving sexp_of]
 type 'a parser = Token.t list -> 'a pResult
 
-type expr =
-  | Let of (expr * expr)
+type operator =
+  | Add
+  | Sub
+  | Mul
+  | Div
+  | Equ
+  | Neq
+  | Les
+  | Gre
+  | Not
+  | Neg
+[@@deriving sexp]
+
+type statement =
+  | Let of expr * expr
   | Return of expr
+  | Expression of expr
+
+and block = statement list
+
+and expr =
   | Int_lit of int
   | Bool_lit of bool
   | Ident of string
-  | Prefix of prefix_op
-  | Infix of infix_op
-
-and infix_op =
-  | Add of (expr * expr)
-  | Sub of (expr * expr)
-  | Mul of (expr * expr)
-  | Div of (expr * expr)
-  | Equ of (expr * expr)
-  | Neq of (expr * expr)
-  | Les of (expr * expr)
-  | Gre of (expr * expr)
-
-and prefix_op =
-  | Not of expr
-  | Neg of expr
+  | Un_op of operator * expr
+  | Bin_op of operator * expr * expr
+  | If of expr * block * block
 [@@deriving sexp]
 
 let map ~(f : 'a -> 'b) (p : 'a parser) : 'b parser =
@@ -175,64 +180,100 @@ let rec expression ~(minp : int) input : expr pResult =
 
 and minus_pre input =
   (tag Token.Minus *> expression ~minp:prefix
-  |> map ~f:(fun a -> Prefix (Neg a))
+  |> map ~f:(fun a -> Un_op (Neg, a))
   )
     input
 
 and bang_pre input =
-  (tag Token.Bang *> expression ~minp:prefix |> map ~f:(fun a -> Prefix (Not a)))
+  (tag Token.Bang *> expression ~minp:prefix |> map ~f:(fun a -> Un_op (Not, a)))
     input
 
 and add lhs input =
   (tag Token.Plus *> expression ~minp:addsub
-  |> map ~f:(fun a -> Infix (Add (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Add, lhs, a))
   )
     input
 
 and sub lhs input =
   (tag Token.Minus *> expression ~minp:addsub
-  |> map ~f:(fun a -> Infix (Sub (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Sub, lhs, a))
   )
     input
 
 and mul lhs input =
   (tag Token.Asterisk *> expression ~minp:muldiv
-  |> map ~f:(fun a -> Infix (Mul (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Mul, lhs, a))
   )
     input
 
 and div lhs input =
   (tag Token.Slash *> expression ~minp:muldiv
-  |> map ~f:(fun a -> Infix (Div (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Div, lhs, a))
   )
     input
 
 and equ lhs input =
   (tag Token.Equals *> expression ~minp:muldiv
-  |> map ~f:(fun a -> Infix (Equ (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Equ, lhs, a))
   )
     input
 
 and neq lhs input =
   (tag Token.Not_equals *> expression ~minp:muldiv
-  |> map ~f:(fun a -> Infix (Neq (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Neq, lhs, a))
   )
     input
 
 and les lhs input =
   (tag Token.Lt *> expression ~minp:muldiv
-  |> map ~f:(fun a -> Infix (Les (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Les, lhs, a))
   )
     input
 
 and gre lhs input =
   (tag Token.Gt *> expression ~minp:muldiv
-  |> map ~f:(fun a -> Infix (Gre (lhs, a)))
+  |> map ~f:(fun a -> Bin_op (Gre, lhs, a))
   )
     input
 
 and grouped input =
   (tag Token.Lparen *> expression ~minp:lowest <* tag Token.Rparen) input
+
+and ifp input =
+  (tag Token.If *> expression ~minp:lowest
+  <*> block
+  <* tag Token.Else
+  <*> block
+  |> map ~f:(fun ((cond, conseq), alt) -> If (cond, conseq, alt))
+  )
+    input
+
+and block input = (tag Token.Lbrace *> many statement <* tag Token.Rbrace) input
+
+and let_s input =
+  (tag Token.Let *> ident
+  <* tag Token.Assign
+  <*> expression ~minp:lowest
+  <* optional (tag Token.Semicolon)
+  |> map ~f:(fun (a, b) -> Let (a, b))
+  )
+    input
+
+and return_s input =
+  (tag Token.Return *> expression ~minp:lowest
+  <* optional (tag Token.Semicolon)
+  |> map ~f:(fun a -> Return a)
+  )
+    input
+
+and expression_s input =
+  (expression ~minp:lowest
+  <* optional (tag Token.Semicolon)
+  |> map ~f:(fun a -> Expression a)
+  )
+    input
+
+and statement input = (let_s <|> return_s <|> expression_s) input
 
 and get_prefix_fn (tok : Token.t) : expr parser option =
   let open Token in
@@ -244,6 +285,7 @@ and get_prefix_fn (tok : Token.t) : expr parser option =
   | True -> Some btrue
   | False -> Some bfalse
   | Lparen -> Some grouped
+  | If -> Some ifp
   | _ -> None
 
 and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
@@ -260,7 +302,7 @@ and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   | _ -> None
 ;;
 
-let let_s : expr parser =
+let let_s : statement parser =
   tag Token.Let *> ident
   <* tag Token.Assign
   <*> expression ~minp:lowest
@@ -268,14 +310,16 @@ let let_s : expr parser =
   |> map ~f:(fun (a, b) -> Let (a, b))
 ;;
 
-let return_s : expr parser =
+let return_s : statement parser =
   tag Token.Return *> expression ~minp:lowest
   <* optional (tag Token.Semicolon)
   |> map ~f:(fun a -> Return a)
 ;;
 
-let expression_s : expr parser =
-  expression ~minp:lowest <* optional (tag Token.Semicolon)
+let expression_s : statement parser =
+  expression ~minp:lowest
+  <* optional (tag Token.Semicolon)
+  |> map ~f:(fun a -> Expression a)
 ;;
 
 let statement = let_s <|> return_s <|> expression_s
