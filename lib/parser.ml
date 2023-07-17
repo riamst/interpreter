@@ -319,7 +319,7 @@ and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
   | _ -> None
 ;;
 
-let let_s : expr parser =
+let let_s =
   tag Token.Let *> ident
   <* tag Token.Assign
   <*> expression ~minp:lowest

@@ -20,6 +20,7 @@ let input =
 ;;
 
 let repl () =
+  let env = Eval.Env.new_global () in
   while true do
     printf "%s" "> ";
     Out_channel.flush stdout;
@@ -32,9 +33,13 @@ let repl () =
     let open Parser in
     parse ~using:statement input |> fun parsed ->
     match parsed with
-    | Ok (_, a) ->
+    | Ok (_, a) -> (
       printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum);
-      printf "%s\n" (Eval.eval a |> Eval.sexp_of_value |> Sexp.to_string_hum)
+      try
+        printf "%s\n"
+          (Eval.eval env a |> Eval.Env.sexp_of_value |> Sexp.to_string_hum)
+      with Failure e -> printf "%s\n" e
+    )
     | Error e -> printf "%s\n" e
   done
 ;;
