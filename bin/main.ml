@@ -31,7 +31,7 @@ let repl () =
       with _ -> printf "%s\n" "Exiting"; exit 0
     in
     let open Parser in
-    parse ~using:statement input |> fun parsed ->
+    parse ~using:(all_consuming statement) input |> fun parsed ->
     match parsed with
     | Ok (_, a) -> (
       printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum);
@@ -40,7 +40,7 @@ let repl () =
           (Eval.eval env a |> Eval.Env.sexp_of_value |> Sexp.to_string_hum)
       with Failure e -> printf "%s\n" e
     )
-    | Error e -> printf "%s\n" e
+    | Error e -> printf "Parsing Error: %s\n" e
   done
 ;;
 

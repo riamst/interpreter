@@ -96,6 +96,19 @@ let optional (p : 'a parser) : 'a option parser =
   | Error _ -> Ok (input, None)
 ;;
 
+let all_consuming (p : 'a parser) : 'a parser =
+ fun input ->
+  match p input with
+  | Error e -> Error e
+  | Ok ([], parsed) -> Ok ([], parsed)
+  | Ok (failtok :: _, _) ->
+    Error
+      (Printf.sprintf
+         "(all_consuming) expected to consume the whole input, failed at: %s\n"
+         (failtok |> Token.sexp_of_t |> Sexp.to_string_hum)
+      )
+;;
+
 let many (p : 'a parser) : 'a list parser =
  fun input ->
   let result = ref [] in
