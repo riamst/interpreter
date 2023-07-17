@@ -5,6 +5,7 @@ module Env = struct
   type value =
     | Int_val of int
     | Bool_val of bool
+    | String_val of string
     | Unit
     | Function of expr list * block * (t[@sexp.opaque])
 
@@ -41,14 +42,33 @@ let eval_bin_op op lhs rhs =
   let open Env in
   match (op, lhs, rhs) with
   | Add, Int_val lhs, Int_val rhs -> Int_val (lhs + rhs)
+  | Add, String_val lhs, String_val rhs -> String_val (lhs ^ rhs)
+  | Add, String_val lhs, Int_val rhs -> String_val (lhs ^ Int.to_string rhs)
+  | Add, Int_val lhs, String_val rhs -> String_val (Int.to_string lhs ^ rhs)
   | Sub, Int_val lhs, Int_val rhs -> Int_val (lhs - rhs)
   | Mul, Int_val lhs, Int_val rhs -> Int_val (lhs * rhs)
+  | Mul, String_val lhs, Int_val rhs ->
+    String_val
+      (let str = ref lhs in
+       for i = 1 to rhs do
+         str := !str ^ lhs
+       done;
+       !str
+      )
+  | Mul, Int_val lhs, String_val rhs ->
+    String_val
+      (let str = ref rhs in
+       for i = 1 to lhs do
+         str := !str ^ rhs
+       done;
+       !str
+      )
   | Div, Int_val lhs, Int_val rhs -> Int_val (lhs / rhs)
   | Les, Int_val lhs, Int_val rhs -> Bool_val (lhs < rhs)
   | Gre, Int_val lhs, Int_val rhs -> Bool_val (lhs > rhs)
   | Equ, Int_val lhs, Int_val rhs -> Bool_val (lhs = rhs)
   | Neq, Int_val lhs, Int_val rhs -> Bool_val (lhs <> rhs)
-  | _ -> failwith "type error"
+  | _ -> failwith "Error: type error"
 ;;
 
 let eval_un_op op rhs =
@@ -56,7 +76,7 @@ let eval_un_op op rhs =
   match (op, rhs) with
   | Not, Bool_val a -> Bool_val (not a)
   | Neg, Int_val a -> Int_val (-a)
-  | _ -> failwith "type error"
+  | _ -> failwith "Error: type error"
 ;;
 
 let rec eval env expr =
@@ -64,8 +84,9 @@ let rec eval env expr =
   match expr with
   | Ident a -> (
     try get env a |> Option.value_exn
-    with _ -> failwith "Error: variable not bound"
+    with _ -> failwith (Printf.sprintf "Error: variable %s not bound" a)
   )
+  | String a -> String_val a
   | Let (Ident name, a) ->
     let data = eval env a in
     printf "var: %s = %s\n" name (data |> sexp_of_value |> Sexp.to_string_hum);
@@ -84,7 +105,7 @@ let rec eval env expr =
     let fn' = eval env fn in
     let args' = List.map ~f:(fun a -> eval env a) args in
     apply_function fn' args'
-  | _ -> failwith "wh"
+  | _ -> failwith "Error: Not evaluatable"
 
 and eval_block env block =
   let open Env in
@@ -106,9 +127,9 @@ and apply_function (fn : Env.value) args : Env.value =
       ~f:(fun (key, data) ->
         match key with
         | Ident str -> set env ~key:str ~data
-        | _ -> failwith "bigerror"
+        | _ -> failwith "(apply function) unreachable"
       )
       (List.zip_exn params args);
     eval_block env body
-  | _ -> failwith "tried to call a non-function"
+  | _ -> failwith "Error: tried to call a non-function"
 ;;

@@ -8,6 +8,7 @@ module Token : sig
     (* Identifiers + literals *)
     | Ident
     | Int
+    | String
     (* Operators *)
     | Assign
     | Plus

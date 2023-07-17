@@ -6,6 +6,7 @@ module Token = struct
     (* Identifiers + literals *)
     | Ident
     | Int
+    | String
     (* Operators *)
     | Assign
     | Plus
@@ -54,6 +55,7 @@ module Token = struct
   ;;
 
   let int a = { toktype = Int; lit = a }
+  let string a = { toktype = String; lit = a }
 
   let equal a b =
     match (a.toktype, b) with
@@ -61,6 +63,7 @@ module Token = struct
     (* Identifiers *)
     | Ident, Ident -> true
     | Int, Int -> true
+    | String, String -> true
     (* Operators *)
     | Assign, Assign -> true
     | Plus, Plus -> true
@@ -179,19 +182,31 @@ let of_char a lex =
 
 let next_token lex =
   let lex = skip_ws lex in
-  let open Token in
   match lex.ch with
   | Some a when Char.is_alpha a ->
-    let str, next_lex = read_while ~f:is_ident_char lex in
-    let tok = ident_or_keyword str in
+    let str, next_lex = read_while ~f:Token.is_ident_char lex in
+    let tok = Token.ident_or_keyword str in
     Some (tok, next_lex)
   | Some a when Char.is_digit a ->
     let str, next_lex = read_while ~f:Char.is_digit lex in
-    let tok = int str in
+    let tok = Token.int str in
+    Some (tok, next_lex)
+  | Some '"' ->
+    let next_lex = read_char lex in
+    let str, next_lex =
+      read_while ~f:(fun a -> not (Char.equal '"' a)) next_lex
+    in
+    let next_lex = read_char next_lex in
+    let tok = Token.string str in
     Some (tok, next_lex)
   | Some a -> Some (of_char a lex)
   | None -> None
 ;;
 
-let to_list lex = Sequence.unfold ~init:lex ~f:next_token |> Sequence.to_list
+let to_list lex =
+  let a = Sequence.unfold ~init:lex ~f:next_token |> Sequence.to_list in
+  printf "%s\n" (a |> sexp_of_list Token.sexp_of_t |> Sexp.to_string_hum);
+  a
+;;
+
 let of_string str = str |> build |> read_char |> to_list

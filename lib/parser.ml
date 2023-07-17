@@ -25,6 +25,7 @@ and expr =
   | Int_lit of int
   | Bool_lit of bool
   | Ident of string
+  | String of string
   | Un_op of operator * expr
   | Bin_op of operator * expr * expr
   | If of expr * block * block
@@ -129,6 +130,7 @@ let delimited (delim : 'a parser) (elem : 'b parser) : 'b list parser =
 
 let int = tag Token.Int |> map ~f:(fun a -> Int_lit (Int.of_string a))
 let ident = tag Token.Ident |> map ~f:(fun a -> Ident a)
+let string = tag Token.String |> map ~f:(fun a -> String a)
 let btrue = tag Token.True |> map ~f:(fun _ -> Bool_lit true)
 let bfalse = tag Token.False |> map ~f:(fun _ -> Bool_lit false)
 
@@ -315,6 +317,7 @@ and get_prefix_fn (tok : Token.t) : expr parser option =
   | Lparen -> Some grouped
   | If -> Some ifp
   | Function -> Some func
+  | String -> Some string
   | _ -> None
 
 and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =

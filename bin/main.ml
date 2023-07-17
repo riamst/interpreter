@@ -44,18 +44,4 @@ let repl () =
   done
 ;;
 
-let () =
-  (* let tokens = Lexer.of_string input in *)
-  (* List.iter *)
-  (*   ~f:(fun a -> *)
-  (*     a |> Lexer.Token.sexp_of_t |> Sexp.to_string_hum |> print_endline *)
-  (*   ) *)
-  (*   tokens; *)
-  (* let open Parser in *)
-  (* tokens *)
-  (* |> many statement *)
-  (* |> sexp_of_pResult (sexp_of_list sexp_of_statement) *)
-  (* |> Sexp.to_string_hum *)
-  (* |> print_endline; *)
-  repl ()
-;;
+let () = repl ()
