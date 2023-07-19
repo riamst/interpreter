@@ -28,6 +28,10 @@ let repl () =
       try
         match In_channel.input_line In_channel.stdin with
         | Some "exit" -> failwith ""
+        | Some a when String.is_prefix ~prefix:":load " a -> (
+          let filename = String.chop_prefix_if_exists ~prefix:":load " a in
+          try In_channel.read_all filename with _ -> failwith ""
+        )
         | Some a -> a
         | None -> failwith ""
       with _ -> printf "%s\n" "Exiting"; exit 0
