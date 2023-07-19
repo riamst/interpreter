@@ -6,8 +6,10 @@ module Env = struct
     | Int_val of int
     | Bool_val of bool
     | String_val of string
-    | Unit
+    | Array_val of value list
+    | Null
     | Function of expr list * block * (t[@sexp.opaque])
+    | Builtin of (value list -> value)
 
   and t = {
     store: (string, value) Hashtbl.t;
@@ -83,15 +85,18 @@ let rec eval env expr =
   let open Env in
   match expr with
   | Ident a -> (
-    try get env a |> Option.value_exn
+    try
+      match get env a with
+      | Some value -> value
+      | None -> builtins a |> Option.value_exn
     with _ -> failwith (Printf.sprintf "Error: variable %s not bound" a)
   )
-  | String a -> String_val a
+  | String_lit a -> String_val a
   | Let (Ident name, a) ->
     let data = eval env a in
     printf "var: %s = %s\n" name (data |> sexp_of_value |> Sexp.to_string_hum);
     set env ~key:name ~data;
-    Unit
+    Null
   | Return a -> eval env a
   | Int_lit a -> Int_val a
   | Bool_lit a -> Bool_val a
@@ -101,6 +106,12 @@ let rec eval env expr =
     if eval env cond |> to_native_bool then eval_block env conseq
     else eval_block env alt
   | Fn_lit (params, body) -> Function (params, body, env)
+  | Array_lit a -> Array_val (List.map ~f:(eval env) a)
+  | Index (left, i) -> (
+    match (eval env left, eval env i) with
+    | Array_val a, Int_val idx -> List.nth a idx |> Option.value ~default:Null
+    | _ -> failwith "notpog"
+  )
   | Call (fn, args) ->
     let fn' = eval env fn in
     let args' = List.map ~f:(fun a -> eval env a) args in
@@ -109,7 +120,7 @@ let rec eval env expr =
 
 and eval_block env block =
   let open Env in
-  List.fold_until ~init:Unit
+  List.fold_until ~init:Null
     ~f:(fun _ e ->
       match e with
       | Return ex -> Stop (eval env ex)
@@ -119,17 +130,133 @@ and eval_block env block =
     block
 
 and apply_function (fn : Env.value) args : Env.value =
-  let open Env in
   match fn with
-  | Env.Function (params, body, fn_env) ->
+  | Function (params, body, fn_env) ->
     let env = Env.new_local fn_env in
     List.iter
       ~f:(fun (key, data) ->
         match key with
-        | Ident str -> set env ~key:str ~data
+        | Ident str -> Env.set env ~key:str ~data
         | _ -> failwith "(apply function) unreachable"
       )
-      (List.zip_exn params args);
+      ( try List.zip_exn params args
+        with _ -> failwith "Unexpected number of arguments"
+      );
     eval_block env body
+  | Builtin builtin_fn -> builtin_fn args
   | _ -> failwith "Error: tried to call a non-function"
+
+and builtins a =
+  match a with
+  | "len" ->
+    Some
+      (Env.Builtin
+         (fun a ->
+           match a with
+           | [ Env.String_val str ] -> Env.Int_val (String.length str)
+           | [ Env.Array_val a ] -> Env.Int_val (List.length a)
+           | [ _ ] ->
+             failwith
+               "Unexpected argument type for len function, expected string or \
+                array"
+           | x ->
+             failwith
+               (Printf.sprintf
+                  "Unexpected number of arguments; expected 1, found %s"
+                  (List.length x |> Int.to_string)
+               )
+         )
+      )
+  | "first" ->
+    Some
+      (Env.Builtin
+         (fun a ->
+           match a with
+           | [ Env.Array_val a ] -> List.hd a |> Option.value ~default:Env.Null
+           | [ _ ] ->
+             failwith
+               "Unexpected argument type for first function, expected array"
+           | x ->
+             failwith
+               (Printf.sprintf
+                  "Unexpected number of arguments; expected 1, found %s"
+                  (List.length x |> Int.to_string)
+               )
+         )
+      )
+  | "last" ->
+    Some
+      (Env.Builtin
+         (fun a ->
+           match a with
+           | [ Env.Array_val a ] ->
+             List.last a |> Option.value ~default:Env.Null
+           | [ _ ] ->
+             failwith
+               "Unexpected argument type for last function, expected array"
+           | x ->
+             failwith
+               (Printf.sprintf
+                  "Unexpected number of arguments; expected 1, found %s"
+                  (List.length x |> Int.to_string)
+               )
+         )
+      )
+  | "rest" ->
+    Some
+      (Env.Builtin
+         (fun a ->
+           match a with
+           | [ Env.Array_val a ] ->
+             List.tl a
+             |> Option.map ~f:(fun a -> Env.Array_val a)
+             |> Option.value ~default:Env.Null
+           | [ _ ] ->
+             failwith
+               "Unexpected argument type for rest function, expected array"
+           | x ->
+             failwith
+               (Printf.sprintf
+                  "Unexpected number of arguments; expected 1, found %s"
+                  (List.length x |> Int.to_string)
+               )
+         )
+      )
+  | "cons" ->
+    Some
+      (Env.Builtin
+         (fun a ->
+           match a with
+           | [ Env.Array_val a; b ] -> Env.Array_val (b :: a)
+           | [ _ ] ->
+             failwith
+               "Unexpected argument type for cons function, expected array"
+           | x ->
+             failwith
+               (Printf.sprintf
+                  "Unexpected number of arguments for cons function; expected \
+                   2, found %s"
+                  (List.length x |> Int.to_string)
+               )
+         )
+      )
+  | "push" ->
+    Some
+      (Env.Builtin
+         (fun a ->
+           match a with
+           | [ Env.Array_val a; b ] -> Env.Array_val (a @ [ b ])
+           | [ _ ] ->
+             failwith
+               "Unexpected argument type for push function, expected array"
+           | x ->
+             failwith
+               (Printf.sprintf
+                  "Unexpected number of arguments for push function; expected \
+                   2, found %s"
+                  (List.length x |> Int.to_string)
+               )
+         )
+      )
+  | _ -> None
 ;;

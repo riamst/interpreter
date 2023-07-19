@@ -25,6 +25,8 @@ module Token = struct
     | Rparen
     | Lbrace
     | Rbrace
+    | Lbracket
+    | Rbracket
     (* Keywords *)
     | Function
     | Let
@@ -82,6 +84,8 @@ module Token = struct
     | Rparen, Rparen -> true
     | Lbrace, Lbrace -> true
     | Rbrace, Rbrace -> true
+    | Lbracket, Lbracket -> true
+    | Rbracket, Rbracket -> true
     (* Keywords *)
     | Function, Function -> true
     | Let, Let -> true
@@ -175,6 +179,8 @@ let of_char a lex =
     | '/' -> { toktype = Slash; lit = String.of_char '/' }
     | '<' -> { toktype = Lt; lit = String.of_char '<' }
     | '>' -> { toktype = Gt; lit = String.of_char '>' }
+    | '[' -> { toktype = Lbracket; lit = String.of_char '[' }
+    | ']' -> { toktype = Rbracket; lit = String.of_char ']' }
     | a -> { toktype = Illegal; lit = String.of_char a }
   in
   (tok, read_char !lex)

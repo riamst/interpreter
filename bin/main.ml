@@ -26,8 +26,10 @@ let repl () =
     Out_channel.flush stdout;
     let input =
       try
-        let a = In_channel.input_line In_channel.stdin |> Option.value_exn in
-        if String.equal a "exit" then failwith "exiting" else a
+        match In_channel.input_line In_channel.stdin with
+        | Some "exit" -> failwith ""
+        | Some a -> a
+        | None -> failwith ""
       with _ -> printf "%s\n" "Exiting"; exit 0
     in
     let open Parser in

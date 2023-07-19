@@ -27,6 +27,8 @@ module Token : sig
     | Rparen
     | Lbrace
     | Rbrace
+    | Lbracket
+    | Rbracket
     (* Keywords *)
     | Function
     | Let
