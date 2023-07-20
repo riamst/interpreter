@@ -2,18 +2,19 @@ open Core
 open Parser
 
 module Env = struct
-  type value =
+  type t =
     | Int_val of int
     | Bool_val of bool
     | String_val of string
-    | Array_val of value list
+    | Array_val of t list
+    | Hash_val of (t, t) Hashtbl.t
     | Null
-    | Function of expr list * block * (t[@sexp.opaque])
-    | Builtin of (value list -> value)
+    | Function of expr list * block * (env[@sexp.opaque])
+    | Builtin of (t list -> t)
 
-  and t = {
-    store: (string, value) Hashtbl.t;
-    outer: (string, value) Hashtbl.t option;
+  and env = {
+    store: (string, t) Hashtbl.t;
+    outer: (string, t) Hashtbl.t option;
   }
   [@@deriving sexp_of]
 
@@ -94,7 +95,7 @@ let rec eval env expr =
   | String_lit a -> String_val a
   | Let (Ident name, a) ->
     let data = eval env a in
-    printf "var: %s = %s\n" name (data |> sexp_of_value |> Sexp.to_string_hum);
+    printf "var: %s = %s\n" name (data |> sexp_of_t |> Sexp.to_string_hum);
     set env ~key:name ~data;
     Null
   | Return a -> eval env a
@@ -129,7 +130,7 @@ and eval_block env block =
     ~finish:(fun a -> a)
     block
 
-and apply_function (fn : Env.value) args : Env.value =
+and apply_function fn args =
   match fn with
   | Function (params, body, fn_env) ->
     let env = Env.new_local fn_env in

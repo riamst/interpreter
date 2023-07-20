@@ -27,6 +27,7 @@ module Token = struct
     | Rbrace
     | Lbracket
     | Rbracket
+    | Colon
     (* Keywords *)
     | Function
     | Let
@@ -86,6 +87,7 @@ module Token = struct
     | Rbrace, Rbrace -> true
     | Lbracket, Lbracket -> true
     | Rbracket, Rbracket -> true
+    | Colon, Colon -> true
     (* Keywords *)
     | Function, Function -> true
     | Let, Let -> true
@@ -181,6 +183,7 @@ let of_char a lex =
     | '>' -> { toktype = Gt; lit = String.of_char '>' }
     | '[' -> { toktype = Lbracket; lit = String.of_char '[' }
     | ']' -> { toktype = Rbracket; lit = String.of_char ']' }
+    | ':' -> { toktype = Colon; lit = String.of_char ':' }
     | a -> { toktype = Illegal; lit = String.of_char a }
   in
   (tok, read_char !lex)
@@ -211,7 +214,6 @@ let next_token lex =
 
 let to_list lex =
   let a = Sequence.unfold ~init:lex ~f:next_token |> Sequence.to_list in
-  printf "%s\n" (a |> sexp_of_list Token.sexp_of_t |> Sexp.to_string_hum);
   a
 ;;
 

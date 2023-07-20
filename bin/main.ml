@@ -37,7 +37,7 @@ let repl () =
       with _ -> printf "%s\n" "Exiting"; exit 0
     in
     let open Parser in
-    parse ~using:(all_consuming statement) input |> fun parsed ->
+    parse ~using:(Parsik.all_consuming statement) input |> fun parsed ->
     match parsed with
     | Ok (_, a) -> (
       printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum);

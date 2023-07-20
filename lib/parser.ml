@@ -1,8 +1,6 @@
 open Core
 open Lexer
-
-type 'a pResult = (Token.t list * 'a, string) Result.t [@@deriving sexp_of]
-type 'a parser = Token.t list -> 'a pResult
+open Parsik
 
 type operator =
   | Add
@@ -15,7 +13,7 @@ type operator =
   | Gre
   | Not
   | Neg
-[@@deriving sexp]
+[@@deriving sexp_of]
 
 and block = expr list
 
@@ -27,114 +25,14 @@ and expr =
   | Array_lit of expr list
   | Ident of string
   | String_lit of string
+  | Hash_lit of (expr * expr) list
   | Index of expr * expr
   | Un_op of operator * expr
   | Bin_op of operator * expr * expr
   | If of expr * block * block
   | Fn_lit of expr list * block
   | Call of expr * expr list
-[@@deriving sexp]
-
-let map ~(f : 'a -> 'b) (p : 'a parser) : 'b parser =
- fun input ->
-  match p input with
-  | Ok (input', x) -> Ok (input', f x)
-  | Error e -> Error e
-;;
-
-let tag (token_tag : Token.tokentype) : string parser =
- fun input ->
-  match input with
-  | t :: rest when Token.equal t token_tag -> Ok (rest, Token.to_string t)
-  | t :: _ ->
-    Error
-      (Printf.sprintf "expected %s, found %s\n"
-         (token_tag |> Token.sexp_of_tokentype |> Sexp.to_string_hum)
-         (t |> Token.sexp_of_t |> Sexp.to_string_hum)
-      )
-  | [] -> Error "End of File"
-;;
-
-let ( *> ) (p1 : 'a parser) (p2 : 'b parser) : 'b parser =
- fun input ->
-  p1 input |> Result.map ~f:(fun (input', _) -> p2 input') |> Result.join
-;;
-
-let ( <* ) (p1 : 'a parser) (p2 : 'b parser) : 'a parser =
- fun input ->
-  input
-  |> p1
-  |> Result.map ~f:(fun (input', x) ->
-         input' |> p2 |> Result.map ~f:(fun (input'', _) -> (input'', x))
-     )
-  |> Result.join
-;;
-
-let ( <*> ) (p1 : 'a parser) (p2 : 'b parser) : ('a * 'b) parser =
- fun input ->
-  input
-  |> p1
-  |> Result.map ~f:(fun (input', x) ->
-         input' |> p2 |> Result.map ~f:(fun (input'', y) -> (input'', (x, y)))
-     )
-  |> Result.join
-;;
-
-let ( <|> ) (p1 : 'a parser) (p2 : 'a parser) : 'a parser =
- fun input ->
-  match p1 input with
-  | Ok (input', x) -> Ok (input', x)
-  | Error left_error ->
-    input
-    |> p2
-    |> Result.map_error ~f:(fun right_error ->
-           Printf.sprintf "%s or %s" left_error right_error
-       )
-;;
-
-let optional (p : 'a parser) : 'a option parser =
- fun input ->
-  match p input with
-  | Ok (input', x) -> Ok (input', Some x)
-  | Error _ -> Ok (input, None)
-;;
-
-let all_consuming (p : 'a parser) : 'a parser =
- fun input ->
-  match p input with
-  | Error e -> Error e
-  | Ok ([], parsed) -> Ok ([], parsed)
-  | Ok (failtok :: _, _) ->
-    Error
-      (Printf.sprintf
-         "(all_consuming) expected to consume the whole input, failed at: %s\n"
-         (failtok |> Token.sexp_of_t |> Sexp.to_string_hum)
-      )
-;;
-
-let many (p : 'a parser) : 'a list parser =
- fun input ->
-  let result = ref [] in
-  let rec loop input =
-    match p input with
-    | Ok (rest, x) ->
-      result := x :: !result;
-      loop rest
-    | Error _ -> input
-  in
-  let rest = loop input in
-  Ok (rest, List.rev !result)
-;;
-
-let delimited (delim : 'a parser) (elem : 'b parser) : 'b list parser =
-  optional elem
-  <*> many (delim *> elem)
-  |> map ~f:(fun (a, b) ->
-         match a with
-         | Some x -> x :: b
-         | None -> []
-     )
-;;
+[@@deriving sexp_of]
 
 let int = tag Token.Int |> map ~f:(fun a -> Int_lit (Int.of_string a))
 let ident = tag Token.Ident |> map ~f:(fun a -> Ident a)
@@ -335,6 +233,17 @@ and call lhs input =
   )
     input
 
+and hash input : expr pResult =
+  let pairs =
+    expression ~minp:Prec.lowest
+    <*> tag Token.Colon *> expression ~minp:Prec.lowest
+  in
+  (tag Token.Lbrace *> delimited (tag Token.Comma) pairs
+  <* tag Token.Rbrace
+  |> map ~f:(fun a -> Hash_lit a)
+  )
+    input
+
 and get_prefix_fn (tok : Token.t) : expr parser option =
   let open Token in
   match tok.toktype with
@@ -349,6 +258,7 @@ and get_prefix_fn (tok : Token.t) : expr parser option =
   | Function -> Some func
   | String -> Some string
   | Lbracket -> Some array
+  | Lbrace -> Some hash
   | _ -> None
 
 and get_infix_fn (tok : Token.t) : (expr -> expr parser) option =
