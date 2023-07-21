@@ -1,28 +1,14 @@
 open Interpreter
 open Core
 
-let input =
-  "let five = 5;\n\
-   let ten = 10;\n\
-   let add = fn(x, y) {\n\
-   x + y;\n\
-   };\n\
-   let result = add(five, ten);\n\
-   !-/*5;\n\
-   5 < 10 > 5;\n\
-   if (5 < 10) {\n\
-   return true;\n\
-   } else {\n\
-   return false;\n\
-   }\n\
-   10 == 10;\n\
-   10 != 9;"
-;;
-
 let repl () =
-  let env = Eval.Env.new_global () in
+  print_endline
+    "Welcome to the Monkey REPL\n\
+     Start typing in your program, or type \": load <filename>\" to load from \
+     a file";
+  let env = Object.new_global () in
   while true do
-    printf "%s" "> ";
+    print_string "> ";
     Out_channel.flush stdout;
     let input =
       try
@@ -34,18 +20,17 @@ let repl () =
         )
         | Some a -> a
         | None -> failwith ""
-      with _ -> printf "%s\n" "Exiting"; exit 0
+      with _ -> print_endline "Exiting"; exit 0
     in
     let open Parser in
-    parse ~using:(Parsik.all_consuming statement) input |> fun parsed ->
-    match parsed with
+    match parse ~using:(Parsik.all_consuming statement) input with
     | Ok (_, a) -> (
       (* printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum); *)
       try
         (* printf "%s\n" *)
         (*   (Eval.eval env a |> Eval.Env.sexp_of_t |> Sexp.to_string_hum); *)
-        printf "%s\n" (Eval.eval env a |> Eval.Env.to_string)
-      with Failure e -> printf "%s\n" e
+        print_endline (Eval.eval env a |> Object.to_string)
+      with Failure e -> print_endline e
     )
     | Error e -> printf "Parsing Error: %s\n" e
   done

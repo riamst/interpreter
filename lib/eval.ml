@@ -1,69 +1,13 @@
 open Core
 open Parser
 
-module Env = struct
-  type builtin_func =
-    | Push
-    | Cons
-    | Len
-    | First
-    | Last
-    | Rest
-    | Puts
-  [@@deriving sexp_of]
-
-  type t =
-    | Int_val of int
-    | Bool_val of bool
-    | String_val of string
-    | Array_val of t list
-    | Hash_val of (t, t) Hashtbl.t
-    | Null
-    | Function of expr list * block * (env[@sexp.opaque])
-    | Builtin of builtin_func
-
-  and env = {
-    store: (string, t) Hashtbl.t;
-    outer: (string, t) Hashtbl.t option;
-  }
-  [@@deriving sexp_of]
-
-  let rec to_string t =
-    match t with
-    | Int_val a -> Int.to_string a
-    | Bool_val a -> Bool.to_string a
-    | String_val a -> a
-    | Array_val a -> List.to_string ~f:to_string a
-    | Hash_val a ->
-      Hashtbl.to_alist a
-      |> List.to_string ~f:(fun (a, b) -> to_string a ^ ":" ^ to_string b)
-    | Null -> "null"
-    | Function _ -> "<func>"
-    | Builtin _ -> "<built_in>"
-  ;;
-
-  let new_global () = { store = Hashtbl.Poly.create (); outer = None }
-
-  let new_local { store; _ } =
-    { store = Hashtbl.Poly.create (); outer = Some (Hashtbl.copy store) }
-  ;;
-
-  let get { store; outer } key =
-    match Hashtbl.find store key with
-    | Some a -> Some a
-    | None -> Option.bind ~f:(fun a -> Hashtbl.find a key) outer
-  ;;
-
-  let set { store; _ } ~key ~data = Hashtbl.set store ~key ~data
-end
-
 let to_native_bool = function
-  | Env.Bool_val a -> a
+  | Object.Bool_val a -> a
   | _ -> failwith "type error in condition"
 ;;
 
 let eval_bin_op op lhs rhs =
-  let open Env in
+  let open Object in
   match (op, lhs, rhs) with
   | Add, Int_val lhs, Int_val rhs -> Int_val (lhs + rhs)
   | Add, String_val lhs, String_val rhs -> String_val (lhs ^ rhs)
@@ -96,7 +40,7 @@ let eval_bin_op op lhs rhs =
 ;;
 
 let eval_un_op op rhs =
-  let open Env in
+  let open Object in
   match (op, rhs) with
   | Not, Bool_val a -> Bool_val (not a)
   | Neg, Int_val a -> Int_val (-a)
@@ -104,7 +48,7 @@ let eval_un_op op rhs =
 ;;
 
 let rec eval env expr =
-  let open Env in
+  let open Object in
   match expr with
   | Ident a -> (
     try
@@ -153,7 +97,7 @@ let rec eval env expr =
   | _ -> failwith "Error: Not evaluatable"
 
 and eval_block env block =
-  let open Env in
+  let open Object in
   List.fold_until ~init:Null
     ~f:(fun _ e ->
       match e with
@@ -164,13 +108,14 @@ and eval_block env block =
     block
 
 and apply_function fn args =
+  let open Object in
   match fn with
   | Function (params, body, fn_env) ->
-    let env = Env.new_local fn_env in
+    let env = new_local fn_env in
     List.iter
       ~f:(fun (key, data) ->
         match key with
-        | Ident str -> Env.set env ~key:str ~data
+        | Ident str -> set env ~key:str ~data
         | _ -> failwith "(apply function) unreachable"
       )
       ( try List.zip_exn params args
@@ -180,30 +125,32 @@ and apply_function fn args =
   | Builtin builtin_fn -> builtin_eval builtin_fn args
   | _ -> failwith "Error: tried to call a non-function"
 
-and builtins a : Env.t option =
+and builtins a : Object.t option =
+  let open Object in
   ( match a with
-  | "len" -> Some Env.Len
-  | "first" -> Some Env.First
-  | "last" -> Some Env.Last
-  | "rest" -> Some Env.Rest
-  | "cons" -> Some Env.Cons
-  | "push" -> Some Env.Push
-  | "puts" -> Some Env.Puts
+  | "len" -> Some Len
+  | "first" -> Some First
+  | "last" -> Some Last
+  | "rest" -> Some Rest
+  | "cons" -> Some Cons
+  | "push" -> Some Push
+  | "puts" -> Some Puts
   | _ -> None
   )
-  |> Option.map ~f:(fun a -> Env.Builtin a)
+  |> Option.map ~f:(fun a -> Builtin a)
 
-and builtin_eval a : Env.t list -> Env.t =
+and builtin_eval a : Object.t list -> Object.t =
+  let open Object in
   match a with
-  | Env.Puts ->
+  | Puts ->
     fun alist ->
-      List.iter ~f:(fun a -> a |> Env.to_string |> print_endline) alist;
-      Env.Null
-  | Env.Len -> (
+      List.iter ~f:(fun a -> a |> to_string |> print_endline) alist;
+      Null
+  | Len -> (
     fun a ->
       match a with
-      | [ Env.String_val str ] -> Env.Int_val (String.length str)
-      | [ Env.Array_val a ] -> Env.Int_val (List.length a)
+      | [ String_val str ] -> Int_val (String.length str)
+      | [ Array_val a ] -> Int_val (List.length a)
       | [ _ ] ->
         failwith
           "Unexpected argument type for len function, expected string or array"
@@ -213,10 +160,10 @@ and builtin_eval a : Env.t list -> Env.t =
              (List.length x |> Int.to_string)
           )
   )
-  | Env.First -> (
+  | First -> (
     fun a ->
       match a with
-      | [ Env.Array_val a ] -> List.hd a |> Option.value ~default:Env.Null
+      | [ Array_val a ] -> List.hd a |> Option.value ~default:Null
       | [ _ ] ->
         failwith "Unexpected argument type for first function, expected array"
       | x ->
@@ -225,10 +172,10 @@ and builtin_eval a : Env.t list -> Env.t =
              (List.length x |> Int.to_string)
           )
   )
-  | Env.Last -> (
+  | Last -> (
     fun a ->
       match a with
-      | [ Env.Array_val a ] -> List.last a |> Option.value ~default:Env.Null
+      | [ Array_val a ] -> List.last a |> Option.value ~default:Null
       | [ _ ] ->
         failwith "Unexpected argument type for last function, expected array"
       | x ->
@@ -237,13 +184,13 @@ and builtin_eval a : Env.t list -> Env.t =
              (List.length x |> Int.to_string)
           )
   )
-  | Env.Rest -> (
+  | Rest -> (
     fun a ->
       match a with
-      | [ Env.Array_val a ] ->
+      | [ Array_val a ] ->
         List.tl a
-        |> Option.map ~f:(fun a -> Env.Array_val a)
-        |> Option.value ~default:Env.Null
+        |> Option.map ~f:(fun a -> Array_val a)
+        |> Option.value ~default:Null
       | [ _ ] ->
         failwith "Unexpected argument type for rest function, expected array"
       | x ->
@@ -252,10 +199,10 @@ and builtin_eval a : Env.t list -> Env.t =
              (List.length x |> Int.to_string)
           )
   )
-  | Env.Cons -> (
+  | Cons -> (
     fun a ->
       match a with
-      | [ Env.Array_val a; b ] -> Env.Array_val (b :: a)
+      | [ Array_val a; b ] -> Array_val (b :: a)
       | [ _ ] ->
         failwith "Unexpected argument type for cons function, expected array"
       | x ->
@@ -266,10 +213,10 @@ and builtin_eval a : Env.t list -> Env.t =
              (List.length x |> Int.to_string)
           )
   )
-  | Env.Push -> (
+  | Push -> (
     fun a ->
       match a with
-      | [ Env.Array_val a; b ] -> Env.Array_val (a @ [ b ])
+      | [ Array_val a; b ] -> Array_val (a @ [ b ])
       | [ _ ] ->
         failwith "Unexpected argument type for push function, expected array"
       | x ->
