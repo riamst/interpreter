@@ -40,10 +40,11 @@ let repl () =
     parse ~using:(Parsik.all_consuming statement) input |> fun parsed ->
     match parsed with
     | Ok (_, a) -> (
-      printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum);
+      (* printf "%s\n" (Parser.sexp_of_expr a |> Sexp.to_string_hum); *)
       try
-        printf "%s\n"
-          (Eval.eval env a |> Eval.Env.sexp_of_value |> Sexp.to_string_hum)
+        (* printf "%s\n" *)
+        (*   (Eval.eval env a |> Eval.Env.sexp_of_t |> Sexp.to_string_hum); *)
+        printf "%s\n" (Eval.eval env a |> Eval.Env.to_string)
       with Failure e -> printf "%s\n" e
     )
     | Error e -> printf "Parsing Error: %s\n" e
